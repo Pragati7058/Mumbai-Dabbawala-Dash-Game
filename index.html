@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Mumbai Dabbawala Dash — Pragati Jadhav</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    /* Lock page scroll and accidental selection during fast-paced runner & touch play */
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #090d16;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #f8fafc;
+      touch-action: none;
+    }
+
+    #game-stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 25%, #172554 0%, #090d16 75%);
+    }
+
+    /* Canvas CSS dimensions are calculated dynamically in JS to preserve 16:9 (960x540) */
+    canvas#gameCanvas {
+      display: block;
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.12);
+      touch-action: none;
+      background: #0f172a;
+    }
+
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    .touch-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 9999px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 2px solid rgba(251, 191, 36, 0.45);
+      color: #fef3c7;
+      font-size: 20px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      transition: transform 0.1s ease, background-color 0.1s ease;
+      touch-action: manipulation;
+    }
+
+    .touch-btn:active {
+      transform: scale(0.92);
+      background: rgba(245, 158, 11, 0.35);
+    }
+
+    @media (min-width: 640px) {
+      .touch-btn {
+        width: 64px;
+        height: 64px;
+        font-size: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Main Full-Viewport Game Stage -->
+  <div id="game-stage">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD & Touch Controls Overlay -->
+    <div id="hudLayer" class="fixed inset-0 pointer-events-none flex flex-col justify-between p-2.5 sm:p-4 z-10">
+      <!-- Top Bar -->
+      <div class="flex items-start justify-between gap-2 w-full max-w-6xl mx-auto">
+        <!-- Score, Timer, Lives -->
+        <div class="glass-panel rounded-2xl px-3 py-2 sm:px-5 sm:py-2.5 flex items-center gap-3 sm:gap-6 shadow-lg">
+          <div class="flex flex-col">
+            <span class="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400">Score</span>
+            <span id="hudScore" class="text-base sm:text-xl font-extrabold text-amber-300 tabular-nums">0</span>
+          </div>
+          <div class="h-7 w-px bg-white/10"></div>
+          <div class="flex flex-col">
+            <span class="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400">Time</span>
+            <span id="hudTime" class="text-base sm:text-xl font-extrabold text-emerald-400 tabular-nums">45s</span>
+          </div>
+          <div class="h-7 w-px bg-white/10"></div>
+          <div class="flex flex-col">
+            <span class="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400">Tiffin Lives</span>
+            <span id="hudLives" class="text-sm sm:text-lg font-bold tracking-tight">🍱🍱🍱</span>
+          </div>
+        </div>
+
+        <!-- Active Boosts + Pause + Mute -->
+        <div class="flex items-center gap-2 pointer-events-auto">
+          <div id="boostBadges" class="hidden md:flex items-center gap-1.5">
+            <span id="badgeChai" class="hidden px-2.5 py-1 rounded-full text-xs font-bold bg-orange-500/25 border border-orange-400/50 text-orange-200">
+              ☕ Chai Boost
+            </span>
+            <span id="badgeUmbrella" class="hidden px-2.5 py-1 rounded-full text-xs font-bold bg-sky-500/25 border border-sky-400/50 text-sky-200">
+              ☂️ Rain Shield
+            </span>
+          </div>
+
+          <button
+            id="pauseBtn"
+            type="button"
+            aria-label="Pause Game"
+            class="glass-panel rounded-xl p-2.5 sm:p-3 text-slate-100 hover:bg-white/10 active:scale-95 transition cursor-pointer"
+            title="Pause (P / Esc)"
+          >
+            ⏸️
+          </button>
+
+          <button
+            id="muteBtn"
+            type="button"
+            aria-label="Toggle Sound"
+            class="glass-panel rounded-xl p-2.5 sm:p-3 text-slate-100 hover:bg-white/10 active:scale-95 transition cursor-pointer"
+            title="Toggle Audio"
+          >
+            🔊
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile / Touch On-Screen Buttons -->
+      <div id="touchControls" class="flex sm:hidden items-end justify-between w-full px-2 pb-1 pointer-events-none">
+        <div class="flex items-center gap-3 pointer-events-auto">
+          <button id="btnLaneUp" type="button" class="touch-btn" aria-label="Move Up Lane">⬆️</button>
+          <button id="btnLaneDown" type="button" class="touch-btn" aria-label="Move Down Lane">⬇️</button>
+        </div>
+        <div class="flex items-center gap-3 pointer-events-auto">
+          <button id="btnDuck" type="button" class="touch-btn" aria-label="Duck">🦆</button>
+          <button id="btnJump" type="button" class="touch-btn" aria-label="Jump">🦘</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Start Modal Screen -->
+    <div id="startModal" class="fixed inset-0 z-20 flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+      <div class="glass-panel rounded-3xl max-w-xl w-full p-5 sm:p-7 shadow-2xl border border-amber-400/30 my-auto">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-400/15 text-amber-300 border border-amber-400/30">
+            Family-Friendly Delivery Runner
+          </span>
+          <span class="text-xs font-medium text-slate-400">
+            By <strong class="text-slate-200">Pragati Jadhav</strong>
+          </span>
+        </div>
+
+        <h1 class="text-2xl sm:text-4xl font-black tracking-tight text-white">
+          MUMBAI <span class="text-amber-400">DABBAWALA</span> DASH
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
+          Pedal across 3 lively lanes through 5 iconic Mumbai landmarks, dodge traffic &amp; monsoon puddles, and drop hot tiffins before time runs out!
+        </p>
+
+        <!-- Compact Legend -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 text-[11px] sm:text-xs">
+          <div class="rounded-xl bg-white/5 border border-white/10 p-2">
+            <span class="font-bold text-emerald-400">🟢 Drop Zone:</span> +200 &amp; +6s
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-2">
+            <span class="font-bold text-amber-300">🥡 Tiffin:</span> +50 &amp; +3s
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-2">
+            <span class="font-bold text-orange-300">🍔 Vada Pav:</span> +100 pts
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-2">
+            <span class="font-bold text-yellow-300">🪙 Coin:</span> +25 pts
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-2">
+            <span class="font-bold text-orange-400">☕ Chai:</span> Speed boost
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-2">
+            <span class="font-bold text-sky-300">☂️ Umbrella:</span> Rain/puddle shield
+          </div>
+        </div>
+
+        <!-- Controls Hint -->
+        <div class="mt-3 rounded-xl bg-slate-900/80 border border-white/10 px-3 py-2 text-[11px] sm:text-xs text-slate-300 flex flex-wrap gap-x-4 gap-y-1">
+          <span><strong>Lanes:</strong> ⬅️/➡️ or A/D or Swipe</span>
+          <span><strong>Jump:</strong> Space / ⬆️ / W / Tap</span>
+          <span><strong>Duck:</strong> ⬇️ / S / Swipe Down</span>
+          <span><strong>Pause:</strong> P / Esc</span>
+        </div>
+
+        <!-- Start Trivia Box -->
+        <div id="startTrivia" class="mt-3.5 rounded-2xl bg-sky-500/10 border-l-4 border-sky-400 p-3 text-xs text-sky-100 leading-relaxed"></div>
+
+        <div class="mt-5 flex items-center justify-between gap-3">
+          <div class="text-xs text-slate-400">
+            Best Score: <strong id="startBestScore" class="text-amber-300">0</strong>
+          </div>
+          <button
+            id="startBtn"
+            type="button"
+            class="px-6 py-3 rounded-full font-extrabold text-sm sm:text-base text-slate-950 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300 hover:brightness-110 active:scale-95 shadow-lg shadow-amber-500/25 transition cursor-pointer"
+          >
+            START DELIVERY →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause Modal Screen -->
+    <div id="pauseModal" class="hidden fixed inset-0 z-20 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+      <div class="glass-panel rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-white/15">
+        <h2 class="text-2xl font-extrabold text-amber-300">Delivery Paused</h2>
+        <p class="text-xs sm:text-sm text-slate-300 mt-1">Take a breather—your tiffins are safe!</p>
+        <div class="mt-5 flex flex-col sm:flex-row gap-2.5 justify-center">
+          <button
+            id="resumeBtn"
+            type="button"
+            class="px-5 py-2.5 rounded-full font-bold text-sm text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition cursor-pointer"
+          >
+            Resume
+          </button>
+          <button
+            id="pauseRestartBtn"
+            type="button"
+            class="px-5 py-2.5 rounded-full font-bold text-sm text-white bg-white/10 hover:bg-white/20 border border-white/15 transition cursor-pointer"
+          >
+            Restart Shift
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over Modal Screen -->
+    <div id="gameOverModal" class="hidden fixed inset-0 z-20 flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+      <div class="glass-panel rounded-3xl max-w-md w-full p-6 text-center shadow-2xl border border-rose-400/30 my-auto">
+        <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-400/30 mb-2">
+          Shift Complete
+        </span>
+        <h2 id="gameOverTitle" class="text-2xl sm:text-3xl font-black text-rose-400">Time's Up!</h2>
+        <p id="gameOverSubtitle" class="text-xs sm:text-sm text-slate-300 mt-1">Great hustling through Mumbai's streets!</p>
+
+        <div class="grid grid-cols-2 gap-3 my-4">
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div class="text-[11px] uppercase tracking-wider text-slate-400">Final Score</div>
+            <div id="finalScore" class="text-2xl font-black text-amber-300 mt-0.5 tabular-nums">0</div>
+          </div>
+          <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+            <div class="text-[11px] uppercase tracking-wider text-slate-400">Best Score</div>
+            <div id="bestScore" class="text-2xl font-black text-emerald-400 mt-0.5 tabular-nums">0</div>
+          </div>
+        </div>
+
+        <div id="endTrivia" class="rounded-2xl bg-amber-400/10 border-l-4 border-amber-400 p-3 text-xs text-amber-100 text-left leading-relaxed"></div>
+
+        <button
+          id="restartBtn"
+          type="button"
+          class="mt-5 w-full sm:w-auto px-7 py-3 rounded-full font-extrabold text-sm sm:text-base text-slate-950 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300 hover:brightness-110 active:scale-95 shadow-lg shadow-amber-500/25 transition cursor-pointer"
+        >
+          DELIVER AGAIN ↻
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // =========================================================================
+      // 1. VIRTUAL CANVAS & HIGH-DPI RESPONSIVE SCALING
+      // =========================================================================
+      const VIRTUAL_WIDTH = 960;
+      const VIRTUAL_HEIGHT = 540;
+      const BEST_SCORE_STORAGE_KEY = "mumbai_dabbawala_dash_best_score_v1";
+
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+
+      let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      function applyCanvasResolution() {
+        try {
+          dpr = Math.min(window.devicePixelRatio || 1, 2);
+          canvas.width = Math.round(VIRTUAL_WIDTH * dpr);
+          canvas.height = Math.round(VIRTUAL_HEIGHT * dpr);
+
+          const stage = document.getElementById("game-stage");
+          const availW = stage ? stage.clientWidth : window.innerWidth;
+          const availH = stage ? stage.clientHeight : window.innerHeight;
+          const scale = Math.min(availW / VIRTUAL_WIDTH, availH / VIRTUAL_HEIGHT);
+
+          canvas.style.width = `${Math.floor(VIRTUAL_WIDTH * scale)}px`;
+          canvas.style.height = `${Math.floor(VIRTUAL_HEIGHT * scale)}px`;
+        } catch (err) {
+          console.error("Canvas resize error:", err);
+        }
+      }
+
+      window.addEventListener("resize", applyCanvasResolution);
+      window.addEventListener("orientationchange", () => setTimeout(applyCanvasResolution, 120));
+      applyCanvasResolution();
+
+      // =========================================================================
+      // 2. PROCEDURAL WEB AUDIO SYNTHESIZER & RHYTHMIC BEAT
+      // =========================================================================
+      class SoundSystem {
+        constructor() {
+          this.ctx = null;
+          this.muted = false;
+          this.beatStep = 0;
+          this.beatAccumulator = 0;
+        }
+
+        unlock() {
+          try {
+            if (!this.ctx) {
+              const AudioCtx = window.AudioContext || window.webkitAudioContext;
+              if (AudioCtx) {
+                this.ctx = new AudioCtx();
+              }
+            }
+            if (this.ctx && this.ctx.state === "suspended") {
+              this.ctx.resume();
+            }
+          } catch (err) {
+            // Audio context blocked or unavailable
+          }
+        }
+
+        setMuted(muteState) {
+          this.muted = Boolean(muteState);
+          const muteBtn = document.getElementById("muteBtn");
+          if (muteBtn) {
+            muteBtn.textContent = this.muted ? "🔇" : "🔊";
+          }
+        }
+
+        toggleMute() {
+          this.unlock();
+          this.setMuted(!this.muted);
+        }
+
+        tone(freq, endFreq, type, duration, volume, delay = 0) {
+          if (this.muted || !this.ctx) return;
+          try {
+            const now = this.ctx.currentTime + delay;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, now);
+            if (endFreq && endFreq !== freq) {
+              osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + duration);
+            }
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.linearRampToValueAtTime(volume, now + 0.012);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + duration + 0.02);
+          } catch (err) {
+            // Ignore transient audio scheduling issues
+          }
+        }
+
+        jump() {
+          this.tone(260, 560, "triangle", 0.16, 0.11);
+        }
+
+        duck() {
+          this.tone(320, 160, "sine", 0.12, 0.08);
+        }
+
+        lane() {
+          this.tone(420, 490, "sine", 0.07, 0.06);
+        }
+
+        coin() {
+          this.tone(920, 1320, "sine", 0.14, 0.1);
+        }
+
+        tiffin() {
+          this.tone(587.33, 880, "triangle", 0.16, 0.12);
+        }
+
+        vadaPav() {
+          this.tone(523.25, 783.99, "square", 0.14, 0.08);
+          this.tone(783.99, 1046.5, "triangle", 0.18, 0.09, 0.07);
+        }
+
+        dropZone() {
+          this.tone(523.25, 523.25, "triangle", 0.12, 0.13, 0);
+          this.tone(659.25, 659.25, "triangle", 0.12, 0.13, 0.08);
+          this.tone(783.99, 1046.5, "triangle", 0.24, 0.14, 0.16);
+        }
+
+        powerUp() {
+          this.tone(440, 660, "sine", 0.14, 0.11, 0);
+          this.tone(660, 990, "sine", 0.18, 0.11, 0.09);
+        }
+
+        hit() {
+          this.tone(175, 65, "sawtooth", 0.26, 0.15);
+        }
+
+        puddleSlow() {
+          this.tone(220, 135, "sine", 0.15, 0.08);
+        }
+
+        updateBeat(dt, speedMultiplier) {
+          if (this.muted || !this.ctx || gameState !== "PLAYING") return;
+          const stepInterval = Math.max(0.16, 0.28 / Math.max(0.8, speedMultiplier));
+          this.beatAccumulator += dt;
+          if (this.beatAccumulator >= stepInterval) {
+            this.beatAccumulator -= stepInterval;
+            const pattern = [110, 0, 146.83, 164.81, 110, 196, 146.83, 164.81];
+            const note = pattern[this.beatStep % pattern.length];
+            if (note > 0) {
+              this.tone(note, note, "triangle", stepInterval * 0.65, 0.032);
+            }
+            this.beatStep++;
+          }
+        }
+      }
+
+      const sound = new SoundSystem();
+
+      // =========================================================================
+      // 3. CULTURAL TRIVIA & LANDMARK CONFIGURATION
+      // =========================================================================
+      const TRIVIA_FACTS = [
+        "Mumbai's Dabbawalas have delivered hot homemade lunchboxes since 1890 using a color-coded, symbol-based sorting system without digital trackers.",
+        "Every tiffin carries markings indicating origin kitchen, railway transfer station, destination locality, and building floor.",
+        "Over 200,000 lunch transactions happen daily across Mumbai with extraordinary punctuality and teamwork.",
+        "Dabbawalas ride bicycles and suburban local trains through bustling crowds, monsoon rains, and festival traffic.",
+        "Marine Drive's curved waterfront lamps are famous across Mumbai as the 'Queen's Necklace' after sunset."
+      ];
+
+      const LANDMARKS = [
+        { name: "Marine Drive", accent: "#fbbf24" },
+        { name: "Gateway of India", accent: "#f97316" },
+        { name: "CST Station", accent: "#f43f5e" },
+        { name: "Bandra-Worli Sea Link", accent: "#38bdf8" },
+        { name: "Dharavi Bazaar", accent: "#a855f7" }
+      ];
+
+      // Three road lanes in virtual space (top lane = back, bottom lane = front for Y-sorting)
+      const LANES_Y = [338, 405, 472];
+      const PLAYER_X = 185;
+
+      // =========================================================================
+      // 4. GAME STATE & ENTITIES
+      // =========================================================================
+      let gameState = "START"; // START | PLAYING | PAUSED | GAMEOVER
+      let score = 0;
+      let timeLeft = 45;
+      let lives = 3;
+      let distanceTraveled = 0;
+      let spawnCooldown = 0.75;
+      let elapsedTime = 0;
+
+      // Dynamic day/night cycle and monsoon weather
+      let dayPhase = 0.25; // 0..1 loop; ~0.75-1.0 is night
+      let isNight = false;
+      let isRaining = false;
+      let weatherTimer = 9;
+      let lightningAlpha = 0;
+      let localTrainX = -420;
+      let localTrainTimer = 5;
+
+      // Player state
+      const player = {
+        lane: 1,
+        x: PLAYER_X,
+        y: LANES_Y[1],
+        targetY: LANES_Y[1],
+        jumpY: 0,
+        jumpVy: 0,
+        isJumping: false,
+        duckTimer: 0,
+        chaiTimer: 0,
+        umbrellaTimer: 0,
+        puddleSlowTimer: 0,
+        invulnTimer: 0,
+        pedalPhase: 0,
+        dabbaBounce: 0
+      };
+
+      let entities = [];
+      let particles = [];
+      let floatingPopups = [];
+
+      function getBestScore() {
+        try {
+          return Number(localStorage.getItem(BEST_SCORE_STORAGE_KEY) || "0") || 0;
+        } catch (err) {
+          return 0;
+        }
+      }
+
+      function saveBestScore(val) {
+        try {
+          localStorage.setItem(BEST_SCORE_STORAGE_KEY, String(Math.floor(val)));
+        } catch (err) {
+          // Ignore storage restrictions
+        }
+      }
+
+      function pickRandomTrivia(excludeText = "") {
+        const pool = TRIVIA_FACTS.filter((fact) => fact !== excludeText);
+        const list = pool.length > 0 ? pool : TRIVIA_FACTS;
+        return list[Math.floor(Math.random() * list.length)];
+      }
+
+      function initTriviaScreens() {
+        const startTriviaEl = document.getElementById("startTrivia");
+        const bestEl = document.getElementById("startBestScore");
+        if (startTriviaEl) {
+          startTriviaEl.innerHTML = `<strong class="text-sky-300">Mumbai Dabbawala Trivia:</strong> ${pickRandomTrivia()}`;
+        }
+        if (bestEl) {
+          bestEl.textContent = getBestScore();
+        }
+      }
+
+      function updateHudDom() {
+        document.getElementById("hudScore").textContent = Math.floor(score);
+        const roundedTime = Math.max(0, Math.ceil(timeLeft));
+        const timeEl = document.getElementById("hudTime");
+        timeEl.textContent = `${roundedTime}s`;
+        timeEl.className =
+          roundedTime <= 10
+            ? "text-base sm:text-xl font-extrabold text-rose-400 tabular-nums animate-pulse"
+            : "text-base sm:text-xl font-extrabold text-emerald-400 tabular-nums";
+
+        document.getElementById("hudLives").textContent = "🍱".repeat(Math.max(0, lives)) || "—";
+
+        const badgeChai = document.getElementById("badgeChai");
+        const badgeUmbrella = document.getElementById("badgeUmbrella");
+        if (badgeChai) badgeChai.classList.toggle("hidden", player.chaiTimer <= 0);
+        if (badgeUmbrella) badgeUmbrella.classList.toggle("hidden", player.umbrellaTimer <= 0);
+      }
+
+      function addPopup(x, y, text, color = "#fef08a") {
+        floatingPopups.push({
+          x,
+          y,
+          vy: -42,
+          text,
+          color,
+          life: 0.85,
+          maxLife: 0.85
+        });
+      }
+
+      function spawnBurst(x, y, colors, count = 12, kind = "spark") {
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const spd = 50 + Math.random() * 190;
+          particles.push({
+            kind,
+            x,
+            y,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd - (kind === "confetti" ? 90 : 30),
+            gravity: kind === "confetti" ? 260 : 340,
+            size: kind === "confetti" ? 5 + Math.random() * 4 : 3 + Math.random() * 3,
+            color: colors[i % colors.length],
+            rot: Math.random() * Math.PI * 2,
+            vRot: (Math.random() - 0.5) * 10,
+            life: 0.45 + Math.random() * 0.45,
+            maxLife: 0.9
+          });
+        }
+      }
+
+      function resetGameState() {
+        score = 0;
+        timeLeft = 45;
+        lives = 3;
+        distanceTraveled = 0;
+        spawnCooldown = 0.65;
+        elapsedTime = 0;
+
+        dayPhase = 0.2;
+        isNight = false;
+        isRaining = false;
+        weatherTimer = 10;
+        lightningAlpha = 0;
+        localTrainX = -450;
+        localTrainTimer = 4;
+
+        player.lane = 1;
+        player.x = PLAYER_X;
+        player.y = LANES_Y[1];
+        player.targetY = LANES_Y[1];
+        player.jumpY = 0;
+        player.jumpVy = 0;
+        player.isJumping = false;
+        player.duckTimer = 0;
+        player.chaiTimer = 0;
+        player.umbrellaTimer = 0;
+        player.puddleSlowTimer = 0;
+        player.invulnTimer = 0;
+        player.pedalPhase = 0;
+        player.dabbaBounce = 0;
+
+        entities = [];
+        particles = [];
+        floatingPopups = [];
+        updateHudDom();
+      }
+
+      function startGame() {
+        sound.unlock();
+        resetGameState();
+        gameState = "PLAYING";
+        document.getElementById("startModal").classList.add("hidden");
+        document.getElementById("pauseModal").classList.add("hidden");
+        document.getElementById("gameOverModal").classList.add("hidden");
+      }
+
+      function togglePause() {
+        if (gameState === "PLAYING") {
+          gameState = "PAUSED";
+          document.getElementById("pauseModal").classList.remove("hidden");
+        } else if (gameState === "PAUSED") {
+          sound.unlock();
+          gameState = "PLAYING";
+          document.getElementById("pauseModal").classList.add("hidden");
+        }
+      }
+
+      function triggerGameOver(title, subtitle) {
+        gameState = "GAMEOVER";
+        const finalVal = Math.floor(score);
+        const prevBest = getBestScore();
+        const bestVal = Math.max(prevBest, finalVal);
+        saveBestScore(bestVal);
+
+        document.getElementById("gameOverTitle").textContent = title;
+        document.getElementById("gameOverSubtitle").textContent = subtitle;
+        document.getElementById("finalScore").textContent = finalVal;
+        document.getElementById("bestScore").textContent = bestVal;
+        document.getElementById("startBestScore").textContent = bestVal;
+
+        const currentTrivia = document.getElementById("endTrivia").textContent || "";
+        document.getElementById("endTrivia").innerHTML =
+          `<strong class="text-amber-300">Did You Know?</strong> ${pickRandomTrivia(currentTrivia)}`;
+
+        document.getElementById("gameOverModal").classList.remove("hidden");
+        updateHudDom();
+      }
+
+      // =========================================================================
+      // 5. PLAYER ACTIONS & INPUT HANDLERS
+      // =========================================================================
+      function moveLaneUp() {
+        if (gameState !== "PLAYING") return;
+        if (player.lane > 0) {
+          player.lane--;
+          sound.lane();
+        }
+      }
+
+      function moveLaneDown() {
+        if (gameState !== "PLAYING") return;
+        if (player.lane < LANES_Y.length - 1) {
+          player.lane++;
+          sound.lane();
+        }
+      }
+
+      function triggerJump() {
+        if (gameState !== "PLAYING") return;
+        if (!player.isJumping) {
+          player.isJumping = true;
+          player.jumpVy = -540;
+          player.duckTimer = 0;
+          sound.jump();
+          spawnBurst(player.x - 10, LANES_Y[player.lane], ["#e2e8f0", "#fbbf24"], 6, "spark");
+        }
+      }
+
+      function triggerDuck() {
+        if (gameState !== "PLAYING") return;
+        if (player.isJumping) {
+          // Fast-fall if tapped while airborne
+          player.jumpVy = Math.max(player.jumpVy, 320);
+        }
+        player.duckTimer = 0.65;
+        sound.duck();
+      }
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "p" || e.key === "P" || e.key === "Escape") {
+          if (gameState === "PLAYING" || gameState === "PAUSED") {
+            e.preventDefault();
+            togglePause();
+          }
+          return;
+        }
+
+        if (gameState !== "PLAYING") return;
+
+        if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+          e.preventDefault();
+          moveLaneUp();
+        } else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+          e.preventDefault();
+          moveLaneDown();
+        } else if (e.key === "ArrowUp" || e.key === "w" || e.key === "W" || e.key === " ") {
+          e.preventDefault();
+          triggerJump();
+        } else if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
+          e.preventDefault();
+          triggerDuck();
+        }
+      });
+
+      // On-screen touch buttons
+      document.getElementById("btnLaneUp").addEventListener("click", (e) => {
+        e.stopPropagation();
+        moveLaneUp();
+      });
+      document.getElementById("btnLaneDown").addEventListener("click", (e) => {
+        e.stopPropagation();
+        moveLaneDown();
+      });
+      document.getElementById("btnJump").addEventListener("click", (e) => {
+        e.stopPropagation();
+        triggerJump();
+      });
+      document.getElementById("btnDuck").addEventListener("click", (e) => {
+        e.stopPropagation();
+        triggerDuck();
+      });
+
+      // Canvas swipe & tap gestures
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchActive = false;
+
+      canvas.addEventListener(
+        "touchstart",
+        (e) => {
+          if (!e.touches || e.touches.length === 0) return;
+          sound.unlock();
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          touchActive = true;
+        },
+        { passive: true }
+      );
+
+      canvas.addEventListener(
+        "touchend",
+        (e) => {
+          if (!touchActive || gameState !== "PLAYING" || !e.changedTouches || e.changedTouches.length === 0) {
+            touchActive = false;
+            return;
+          }
+          touchActive = false;
+          const dx = e.changedTouches[0].clientX - touchStartX;
+          const dy = e.changedTouches[0].clientY - touchStartY;
+          const threshold = 28;
+
+          if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) {
+            triggerJump();
+          } else if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx < -threshold) moveLaneUp();
+            else if (dx > threshold) moveLaneDown();
+          } else {
+            if (dy < -threshold) triggerJump();
+            else if (dy > threshold) triggerDuck();
+          }
+        },
+        { passive: true }
+      );
+
+      // UI Button Listeners
+      document.getElementById("startBtn").addEventListener("click", startGame);
+      document.getElementById("restartBtn").addEventListener("click", startGame);
+      document.getElementById("pauseRestartBtn").addEventListener("click", startGame);
+      document.getElementById("resumeBtn").addEventListener("click", togglePause);
+      document.getElementById("pauseBtn").addEventListener("click", togglePause);
+      document.getElementById("muteBtn").addEventListener("click", () => sound.toggleMute());
+
+      // =========================================================================
+      // 6. ENTITY SPAWNING & COLLISION SYSTEM
+      // =========================================================================
+      const SPAWN_POOL = [
+        { type: "tiffin", weight: 18 },
+        { type: "coin", weight: 22 },
+        { type: "vada_pav", weight: 10 },
+        { type: "drop_zone", weight: 9 },
+        { type: "chai", weight: 6 },
+        { type: "umbrella", weight: 5 },
+        { type: "rickshaw", weight: 10 },
+        { type: "bus", weight: 6 },
+        { type: "puddle", weight: 10 },
+        { type: "cow", weight: 6 },
+        { type: "cart", weight: 6 },
+        { type: "pothole", weight: 7 },
+        { type: "banner", weight: 7 },
+        { type: "ganpati_crowd", weight: 6 }
+      ];
+
+      function pickSpawnType() {
+        const total = SPAWN_POOL.reduce((acc, item) => acc + item.weight, 0);
+        let r = Math.random() * total;
+        for (const item of SPAWN_POOL) {
+          r -= item.weight;
+          if (r <= 0) return item.type;
+        }
+        return "coin";
+      }
+
+      function spawnEntity() {
+        const lane = Math.floor(Math.random() * LANES_Y.length);
+        const type = pickSpawnType();
+
+        // Avoid placing duplicate obstacles right on top of each other in the same lane
+        const tooClose = entities.some(
+          (ent) => ent.lane === lane && ent.x > VIRTUAL_WIDTH - 130
+        );
+        const finalLane = tooClose ? (lane + 1) % LANES_Y.length : lane;
+
+        entities.push({
+          type,
+          lane: finalLane,
+          x: VIRTUAL_WIDTH + 65,
+          y: LANES_Y[finalLane],
+          bobOffset: Math.random() * Math.PI * 2
+        });
+      }
+
+      function damagePlayer(reasonText) {
+        if (player.invulnTimer > 0) return;
+        lives--;
+        player.invulnTimer = 1.25;
+        player.puddleSlowTimer = 0.65;
+        sound.hit();
+        spawnBurst(player.x, player.y + player.jumpY - 18, ["#ef4444", "#fbbf24", "#ffffff"], 16, "spark");
+        addPopup(player.x, player.y + player.jumpY - 48, "-1 Tiffin!", "#fda4af");
+        updateHudDom();
+
+        if (lives <= 0) {
+          triggerGameOver("Tiffins Lost!", reasonText || "All 3 tiffin lives were lost on the route.");
+        }
+      }
+
+      function handleEntityCollision(ent, index) {
+        switch (ent.type) {
+          case "tiffin":
+            score += 50;
+            timeLeft = Math.min(99, timeLeft + 3);
+            sound.tiffin();
+            spawnBurst(ent.x, ent.y - 16, ["#facc15", "#f97316", "#ffffff"], 10, "spark");
+            addPopup(ent.x, ent.y - 30, "+50  +3s", "#fde047");
+            entities.splice(index, 1);
+            return;
+
+          case "coin":
+            score += 25;
+            sound.coin();
+            spawnBurst(ent.x, ent.y - 14, ["#fde047", "#f59e0b"], 7, "spark");
+            addPopup(ent.x, ent.y - 26, "+25", "#fef08a");
+            entities.splice(index, 1);
+            return;
+
+          case "vada_pav":
+            score += 100;
+            sound.vadaPav();
+            spawnBurst(ent.x, ent.y - 16, ["#fb923c", "#facc15", "#86efac"], 12, "spark");
+            addPopup(ent.x, ent.y - 30, "+100 Vada Pav!", "#fdba74");
+            entities.splice(index, 1);
+            return;
+
+          case "drop_zone":
+            score += 200;
+            timeLeft = Math.min(99, timeLeft + 6);
+            sound.dropZone();
+            spawnBurst(
+              ent.x,
+              ent.y - 18,
+              ["#4ade80", "#facc15", "#38bdf8", "#f472b6", "#fb923c"],
+              24,
+              "confetti"
+            );
+            addPopup(ent.x, ent.y - 38, "DELIVERED! +200  +6s", "#86efac");
+            entities.splice(index, 1);
+            return;
+
+          case "chai":
+            player.chaiTimer = 4.5;
+            sound.powerUp();
+            spawnBurst(ent.x, ent.y - 18, ["#fb923c", "#fef08a"], 12, "spark");
+            addPopup(ent.x, ent.y - 32, "KULHAD CHAI BOOST!", "#fdba74");
+            entities.splice(index, 1);
+            return;
+
+          case "umbrella":
+            player.umbrellaTimer = 7.0;
+            player.puddleSlowTimer = 0;
+            sound.powerUp();
+            spawnBurst(ent.x, ent.y - 18, ["#38bdf8", "#e0f2fe"], 12, "spark");
+            addPopup(ent.x, ent.y - 32, "UMBRELLA SHIELD!", "#7dd3fc");
+            entities.splice(index, 1);
+            return;
+
+          case "puddle":
+            if (player.jumpY < -14) return; // Jumped cleanly over puddle
+            if (player.umbrellaTimer > 0) {
+              addPopup(ent.x, ent.y - 24, "Shielded!", "#7dd3fc");
+              return;
+            }
+            if (player.puddleSlowTimer <= 0.1) {
+              player.puddleSlowTimer = 1.1;
+              sound.puddleSlow();
+              spawnBurst(ent.x, ent.y, ["#38bdf8", "#bae6fd"], 10, "spark");
+              addPopup(ent.x, ent.y - 24, "Splash! Slowed", "#7dd3fc");
+            }
+            return;
+
+          case "banner":
+            // Must duck when banner reaches player
+            if (player.duckTimer > 0) return;
+            damagePlayer("Clipped by an overhead banner!");
+            entities.splice(index, 1);
+            return;
+
+          case "rickshaw":
+          case "bus":
+          case "cow":
+          case "cart":
+          case "pothole":
+          case "ganpati_crowd": {
+            // Can jump over ground obstacles/vehicles
+            if (player.jumpY < -28) return;
+            const labelMap = {
+              rickshaw: "Bumped into an Auto-Rickshaw!",
+              bus: "Clipped a red BEST Bus!",
+              cow: "Stopped by a street cow!",
+              cart: "Hit a vendor cart!",
+              pothole: "Hit a road pothole!",
+              ganpati_crowd: "Caught in festive crowd traffic!"
+            };
+            damagePlayer(labelMap[ent.type]);
+            entities.splice(index, 1);
+          }
+        }
+      }
+
+      // =========================================================================
+      // 7. SIMULATION UPDATE LOOP
+      // =========================================================================
+      function updateSimulation(dt) {
+        if (gameState !== "PLAYING") return;
+
+        elapsedTime += dt;
+
+        // Countdown timer
+        timeLeft -= dt;
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          updateHudDom();
+          triggerGameOver("Time's Up!", "The delivery clock ran out before your shift ended.");
+          return;
+        }
+
+        // Dynamic day/night cycle (~48s full loop)
+        dayPhase = (dayPhase + dt / 48) % 1;
+        isNight = dayPhase > 0.62 && dayPhase < 0.92;
+
+        // Monsoon rain toggling
+        weatherTimer -= dt;
+        if (weatherTimer <= 0) {
+          isRaining = !isRaining;
+          weatherTimer = isRaining ? 6.5 + Math.random() * 4 : 9 + Math.random() * 6;
+        }
+
+        if (isRaining && Math.random() < dt * 0.45) {
+          lightningAlpha = 0.28;
+        }
+        lightningAlpha = Math.max(0, lightningAlpha - dt * 1.4);
+
+        // Periodic Mumbai local train on CST stretch
+        localTrainTimer -= dt;
+        if (localTrainTimer <= 0 && localTrainX < -380) {
+          localTrainX = VIRTUAL_WIDTH + 80;
+          localTrainTimer = 11 + Math.random() * 6;
+        }
+        if (localTrainX > -420) {
+          localTrainX -= 330 * dt;
+        }
+
+        // Timers & player physics
+        if (player.duckTimer > 0) player.duckTimer = Math.max(0, player.duckTimer - dt);
+        if (player.chaiTimer > 0) player.chaiTimer = Math.max(0, player.chaiTimer - dt);
+        if (player.umbrellaTimer > 0) player.umbrellaTimer = Math.max(0, player.umbrellaTimer - dt);
+        if (player.puddleSlowTimer > 0) player.puddleSlowTimer = Math.max(0, player.puddleSlowTimer - dt);
+        if (player.invulnTimer > 0) player.invulnTimer = Math.max(0, player.invulnTimer - dt);
+
+        player.targetY = LANES_Y[player.lane];
+        player.y += (player.targetY - player.y) * Math.min(1, dt * 16);
+
+        if (player.isJumping) {
+          player.jumpY += player.jumpVy * dt;
+          player.jumpVy += 1450 * dt;
+          if (player.jumpY >= 0) {
+            player.jumpY = 0;
+            player.jumpVy = 0;
+            player.isJumping = false;
+            player.dabbaBounce = 1;
+          }
+        }
+        player.dabbaBounce = Math.max(0, player.dabbaBounce - dt * 5);
+
+        // Speed & distance progression
+        const baseSpeed = 310 + Math.min(170, distanceTraveled * 0.008);
+        const chaiBonus = player.chaiTimer > 0 ? 155 : 0;
+        const rainPenalty = isRaining && player.umbrellaTimer <= 0 ? -35 : 0;
+        const puddlePenalty = player.puddleSlowTimer > 0 && player.umbrellaTimer <= 0 ? -135 : 0;
+        const currentSpeed = Math.max(150, baseSpeed + chaiBonus + rainPenalty + puddlePenalty);
+
+        distanceTraveled += currentSpeed * dt;
+        score += currentSpeed * dt * 0.04;
+        player.pedalPhase += currentSpeed * dt * 0.032;
+
+        sound.updateBeat(dt, currentSpeed / 310);
+
+        // Spawn entities
+        spawnCooldown -= dt;
+        if (spawnCooldown <= 0) {
+          spawnEntity();
+          const paceFactor = Math.min(0.38, distanceTraveled * 0.000018);
+          spawnCooldown = Math.max(0.46, 0.88 - paceFactor + Math.random() * 0.32);
+        }
+
+        // Move entities & check collisions
+        for (let i = entities.length - 1; i >= 0; i--) {
+          const ent = entities[i];
+          ent.x -= currentSpeed * dt;
+
+          if (ent.lane === player.lane && Math.abs(ent.x - player.x) < 38) {
+            handleEntityCollision(ent, i);
+            if (gameState !== "PLAYING") return;
+            continue;
+          }
+
+          if (ent.x < -110) {
+            entities.splice(i, 1);
+          }
+        }
+
+        // Monsoon rain drops & splash particles
+        if (isRaining) {
+          const rainCount = 7;
+          for (let i = 0; i < rainCount; i++) {
+            particles.push({
+              kind: "rain",
+              x: Math.random() * (VIRTUAL_WIDTH + 120),
+              y: -15,
+              vx: -140 - currentSpeed * 0.25,
+              vy: 640 + Math.random() * 180,
+              length: 12 + Math.random() * 10,
+              life: 0.9,
+              maxLife: 0.9
+            });
+          }
+
+          if (Math.random() < 0.65) {
+            const splashLaneY = LANES_Y[Math.floor(Math.random() * LANES_Y.length)];
+            particles.push({
+              kind: "splash",
+              x: Math.random() * VIRTUAL_WIDTH,
+              y: splashLaneY + (Math.random() - 0.5) * 20,
+              vx: (Math.random() - 0.5) * 50,
+              vy: -35 - Math.random() * 45,
+              gravity: 220,
+              size: 2.5,
+              color: "#bae6fd",
+              life: 0.28,
+              maxLife: 0.28
+            });
+          }
+        }
+
+        // Update particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          if (p.gravity) p.vy += p.gravity * dt;
+          if (p.vRot) p.rot += p.vRot * dt;
+          p.life -= dt;
+          if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        // Update floating score popups
+        for (let i = floatingPopups.length - 1; i >= 0; i--) {
+          const pop = floatingPopups[i];
+          pop.y += pop.vy * dt;
+          pop.life -= dt;
+          if (pop.life <= 0) floatingPopups.splice(i, 1);
+        }
+
+        updateHudDom();
+      }
+
+      // =========================================================================
+      // 8. CANVAS RENDERING PIPELINE (LANDMARKS, Y-SORTING, DABBAWALA, EFFECTS)
+      // =========================================================================
+      function getCurrentLandmark() {
+        const idx = Math.floor(distanceTraveled / 2400) % LANDMARKS.length;
+        return LANDMARKS[idx];
+      }
+
+      function drawSkyAndLandmarks(landmarkObj) {
+        // Day-to-night sky gradient
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, 295);
+        if (isNight) {
+          skyGrad.addColorStop(0, "#070b19");
+          skyGrad.addColorStop(0.65, "#111c3a");
+          skyGrad.addColorStop(1, "#1e293b");
+        } else {
+          skyGrad.addColorStop(0, "#0284c7");
+          skyGrad.addColorStop(0.6, "#38bdf8");
+          skyGrad.addColorStop(1, "#bae6fd");
+        }
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, VIRTUAL_WIDTH, 295);
+
+        // Sun or Moon
+        if (isNight) {
+          ctx.fillStyle = "#f8fafc";
+          ctx.beginPath();
+          ctx.arc(820, 68, 22, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = "#fde047";
+          ctx.beginPath();
+          ctx.arc(820, 68, 28, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Distant skyline & landmark-specific architecture
+        const scrollSlow = -(distanceTraveled * 0.14) % 960;
+        const scrollMid = -(distanceTraveled * 0.28) % 960;
+
+        for (let pass = 0; pass < 2; pass++) {
+          const baseX = scrollSlow + pass * 960;
+          ctx.fillStyle = isNight ? "#1e293b" : "#64748b";
+          for (let b = 0; b < 12; b++) {
+            const bx = baseX + b * 85;
+            const bh = 65 + ((b * 37) % 75);
+            ctx.fillRect(bx, 285 - bh, 64, bh);
+            if (isNight) {
+              ctx.fillStyle = "#fbbf24";
+              for (let wy = 295 - bh + 10; wy < 270; wy += 16) {
+                for (let wx = bx + 10; wx < bx + 50; wx += 14) {
+                  if ((wx + wy) % 3 === 0) ctx.fillRect(wx, wy, 6, 7);
+                }
+              }
+              ctx.fillStyle = "#1e293b";
+            }
+          }
+        }
+
+        // Landmark hero silhouettes & details
+        if (landmarkObj.name === "Marine Drive") {
+          // Curved Queen's Necklace promenade & sea wall
+          ctx.fillStyle = "#0ea5e9";
+          ctx.fillRect(0, 248, VIRTUAL_WIDTH, 38);
+          ctx.strokeStyle = isNight ? "#fef08a" : "#ffffff";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(0, 255);
+          ctx.quadraticCurveTo(VIRTUAL_WIDTH * 0.5, 236, VIRTUAL_WIDTH, 255);
+          ctx.stroke();
+
+          for (let lx = 30; lx < VIRTUAL_WIDTH; lx += 75) {
+            ctx.fillStyle = "#fef08a";
+            ctx.beginPath();
+            ctx.arc(lx, 246, isNight ? 5 : 3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (landmarkObj.name === "Gateway of India") {
+          // Iconic basalt arch
+          ctx.fillStyle = isNight ? "#334155" : "#9a6b43";
+          ctx.fillRect(410, 138, 140, 147);
+          ctx.fillStyle = isNight ? "#0f172a" : "#38bdf8";
+          ctx.beginPath();
+          ctx.arc(480, 215, 34, Math.PI, 0);
+          ctx.lineTo(514, 285);
+          ctx.lineTo(446, 285);
+          ctx.closePath();
+          ctx.fill();
+        } else if (landmarkObj.name === "CST Station") {
+          // Victorian Gothic dome & passing local train
+          ctx.fillStyle = isNight ? "#475569" : "#b45309";
+          ctx.fillRect(350, 148, 220, 137);
+          ctx.fillStyle = isNight ? "#64748b" : "#d97706";
+          ctx.beginPath();
+          ctx.arc(460, 148, 42, Math.PI, 0);
+          ctx.fill();
+
+          if (localTrainX > -420) {
+            ctx.fillStyle = "#dc2626";
+            ctx.fillRect(localTrainX, 248, 320, 28);
+            ctx.fillStyle = "#fef08a";
+            for (let cx = localTrainX + 12; cx < localTrainX + 300; cx += 42) {
+              ctx.fillRect(cx, 255, 26, 10);
+            }
+          }
+        } else if (landmarkObj.name === "Bandra-Worli Sea Link") {
+          // Cable-stayed bridge towers & stay cables
+          ctx.fillStyle = "#0369a1";
+          ctx.fillRect(0, 242, VIRTUAL_WIDTH, 44);
+          ctx.strokeStyle = isNight ? "#38bdf8" : "#f8fafc";
+          ctx.lineWidth = 5;
+          [270, 670].forEach((tx) => {
+            ctx.beginPath();
+            ctx.moveTo(tx, 285);
+            ctx.lineTo(tx + 24, 118);
+            ctx.lineTo(tx + 48, 285);
+            ctx.stroke();
+
+            ctx.lineWidth = 1.5;
+            for (let c = -3; c <= 3; c++) {
+              ctx.beginPath();
+              ctx.moveTo(tx + 24, 136);
+              ctx.lineTo(tx + 24 + c * 42, 265);
+              ctx.stroke();
+            }
+            ctx.lineWidth = 5;
+          });
+        } else if (landmarkObj.name === "Dharavi Bazaar") {
+          // Bustling colorful bazaar stalls & Marathi/Hindi street signage
+          for (let pass = 0; pass < 2; pass++) {
+            const baseX = scrollMid + pass * 960;
+            const awningColors = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6"];
+            for (let s = 0; s < 8; s++) {
+              const sx = baseX + s * 120;
+              ctx.fillStyle = isNight ? "#334155" : "#78350f";
+              ctx.fillRect(sx + 10, 205, 96, 80);
+              ctx.fillStyle = awningColors[s % awningColors.length];
+              ctx.fillRect(sx + 6, 194, 104, 14);
+            }
+          }
+        }
+
+        // Cultural signage strip
+        ctx.fillStyle = isNight ? "rgba(254, 240, 138, 0.72)" : "rgba(15, 23, 42, 0.55)";
+        ctx.font = "700 13px Inter, sans-serif";
+        ctx.fillText("मुंबई मेरी जान • चहा & वडापाव • DABBAWALA EXPRESS", 540, 232);
+      }
+
+      function drawRoadAndLanes() {
+        // Sidewalk strip
+        ctx.fillStyle = isNight ? "#1e293b" : "#94a3b8";
+        ctx.fillRect(0, 282, VIRTUAL_WIDTH, 18);
+
+        // Asphalt roadway
+        const roadGrad = ctx.createLinearGradient(0, 300, 0, VIRTUAL_HEIGHT);
+        if (isNight) {
+          roadGrad.addColorStop(0, "#1e293b");
+          roadGrad.addColorStop(1, "#0f172a");
+        } else {
+          roadGrad.addColorStop(0, "#334155");
+          roadGrad.addColorStop(1, "#1e293b");
+        }
+        ctx.fillStyle = roadGrad;
+        ctx.fillRect(0, 300, VIRTUAL_WIDTH, VIRTUAL_HEIGHT - 300);
+
+        // Scrolling lane markings
+        const dashOffset = -(distanceTraveled % 64);
+        ctx.strokeStyle = isNight ? "rgba(253, 224, 71, 0.55)" : "rgba(248, 250, 252, 0.65)";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([34, 30]);
+        ctx.lineDashOffset = dashOffset;
+
+        [371, 438].forEach((dividerY) => {
+          ctx.beginPath();
+          ctx.moveTo(0, dividerY);
+          ctx.lineTo(VIRTUAL_WIDTH, dividerY);
+          ctx.stroke();
+        });
+        ctx.setLineDash([]);
+      }
+
+      function drawDabbawalaPlayer() {
+        const isDucking = player.duckTimer > 0 && !player.isJumping;
+        const py = player.y + player.jumpY;
+
+        ctx.save();
+        ctx.translate(player.x, py);
+
+        // Blink when invulnerable after a hit
+        if (player.invulnTimer > 0 && Math.floor(player.invulnTimer * 16) % 2 === 0) {
+          ctx.globalAlpha = 0.45;
+        }
+
+        // Ground shadow on road
+        const shadowScale = Math.max(0.45, 1 + player.jumpY / 150);
+        ctx.save();
+        ctx.translate(0, -player.jumpY + 12);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 34 * shadowScale, 9 * shadowScale, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Chai speed flames
+        if (player.chaiTimer > 0) {
+          ctx.fillStyle = "#fb923c";
+          ctx.beginPath();
+          ctx.moveTo(-42, -14);
+          ctx.lineTo(-68 - Math.random() * 14, -22);
+          ctx.lineTo(-46, -28);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Bicycle wheels
+        const wheelRadius = 14;
+        [-22, 22].forEach((wx) => {
+          ctx.strokeStyle = "#cbd5e1";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(wx, 0, wheelRadius, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Rotating spokes
+          ctx.strokeStyle = "#64748b";
+          ctx.lineWidth = 1.5;
+          for (let s = 0; s < 4; s++) {
+            const ang = player.pedalPhase + (s * Math.PI) / 4;
+            ctx.beginPath();
+            ctx.moveTo(wx - Math.cos(ang) * wheelRadius, -Math.sin(ang) * wheelRadius);
+            ctx.lineTo(wx + Math.cos(ang) * wheelRadius, Math.sin(ang) * wheelRadius);
+            ctx.stroke();
+          }
+        });
+
+        // Crimson bicycle frame
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(-22, 0);
+        ctx.lineTo(0, 0);
+        ctx.lineTo(14, -20);
+        ctx.lineTo(-10, -20);
+        ctx.closePath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-10, -20);
+        ctx.moveTo(14, -20);
+        ctx.lineTo(22, 0);
+        ctx.stroke();
+
+        // Stacked steel tiffin dabbas on rear carrier
+        const bounceShift = -player.dabbaBounce * 4;
+        for (let d = 0; d < 3; d++) {
+          const dy = -12 - d * 8 + bounceShift;
+          ctx.fillStyle = d % 2 === 0 ? "#e2e8f0" : "#cbd5e1";
+          ctx.fillRect(-33, dy, 15, 7);
+          ctx.strokeStyle = "#475569";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(-33, dy, 15, 7);
+        }
+
+        // Dabbawala rider (white kurta, Gandhi topi, pedaling leg)
+        const duckShiftY = isDucking ? 12 : 0;
+        ctx.save();
+        ctx.translate(-2, -20 + duckShiftY);
+
+        // Pedaling leg
+        const legAng = Math.sin(player.pedalPhase) * 0.65;
+        ctx.strokeStyle = "#f8fafc";
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.moveTo(0, 4);
+        ctx.lineTo(Math.cos(legAng) * 11, 14 + Math.sin(legAng) * 6);
+        ctx.stroke();
+
+        // White Kurta torso
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.roundRect(-8, -16, 16, 22, 4);
+        ctx.fill();
+
+        // Arm holding handlebar
+        ctx.strokeStyle = "#f1f5f9";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(4, -12);
+        ctx.lineTo(16, -4);
+        ctx.stroke();
+
+        // Head
+        ctx.fillStyle = "#d99b66";
+        ctx.beginPath();
+        ctx.arc(2, -23, 7.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Iconic white Gandhi Topi
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.moveTo(-6, -27);
+        ctx.lineTo(11, -27);
+        ctx.lineTo(8, -34);
+        ctx.lineTo(-4, -33);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.restore();
+
+        // Umbrella shield over rider
+        if (player.umbrellaTimer > 0) {
+          ctx.fillStyle = "rgba(56, 189, 248, 0.88)";
+          ctx.beginPath();
+          ctx.arc(2, -56 + duckShiftY * 0.5, 28, Math.PI, 0);
+          ctx.fill();
+          ctx.strokeStyle = "#e0f2fe";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+
+      function drawEntity(ent) {
+        const bob = Math.sin(elapsedTime * 5 + ent.bobOffset) * 3;
+        ctx.save();
+        ctx.translate(ent.x, ent.y);
+
+        switch (ent.type) {
+          case "tiffin":
+            ctx.fillStyle = "#e2e8f0";
+            ctx.fillRect(-11, -22 + bob, 22, 18);
+            ctx.fillStyle = "#ef4444";
+            ctx.fillRect(-12, -25 + bob, 24, 4);
+            ctx.strokeStyle = "#64748b";
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(-11, -22 + bob, 22, 18);
+            break;
+
+          case "coin":
+            ctx.fillStyle = "#facc15";
+            ctx.beginPath();
+            ctx.arc(0, -14 + bob, 11, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#ca8a04";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = "#854d0e";
+            ctx.font = "800 11px Inter, sans-serif";
+            ctx.fillText("₹", -3.5, -10 + bob);
+            break;
+
+          case "vada_pav":
+            ctx.fillStyle = "#fb923c";
+            ctx.beginPath();
+            ctx.ellipse(0, -13 + bob, 13, 9, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#92400e";
+            ctx.beginPath();
+            ctx.arc(0, -11 + bob, 6, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+
+          case "drop_zone": {
+            const pulse = 1 + Math.sin(elapsedTime * 7) * 0.08;
+            ctx.save();
+            ctx.scale(pulse, pulse);
+            ctx.fillStyle = "rgba(74, 222, 128, 0.28)";
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 34, 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#4ade80";
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            ctx.fillStyle = "#22c55e";
+            ctx.fillRect(-15, -34, 30, 22);
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "800 9px Inter, sans-serif";
+            ctx.fillText("DROP", -12, -20);
+            ctx.restore();
+            break;
+          }
+
+          case "chai":
+            ctx.fillStyle = "#c2410c";
+            ctx.beginPath();
+            ctx.moveTo(-9, -22 + bob);
+            ctx.lineTo(9, -22 + bob);
+            ctx.lineTo(7, -6 + bob);
+            ctx.lineTo(-7, -6 + bob);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = "#fde68a";
+            ctx.font = "bold 9px Inter, sans-serif";
+            ctx.fillText("CHAI", -10, -25 + bob);
+            break;
+
+          case "umbrella":
+            ctx.fillStyle = "#38bdf8";
+            ctx.beginPath();
+            ctx.arc(0, -14 + bob, 15, Math.PI, 0);
+            ctx.fill();
+            ctx.strokeStyle = "#0284c7";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(0, -14 + bob);
+            ctx.lineTo(0, -2 + bob);
+            ctx.stroke();
+            break;
+
+          case "rickshaw":
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.beginPath();
+            ctx.ellipse(0, 8, 26, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#facc15";
+            ctx.beginPath();
+            ctx.roundRect(-22, -26, 40, 22, 6);
+            ctx.fill();
+            ctx.fillStyle = "#0f172a";
+            ctx.fillRect(-24, -8, 46, 9);
+            ctx.fillStyle = "#1e293b";
+            ctx.beginPath();
+            ctx.arc(-12, 4, 8, 0, Math.PI * 2);
+            ctx.arc(14, 4, 8, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+
+          case "bus":
+            ctx.fillStyle = "rgba(0,0,0,0.38)";
+            ctx.beginPath();
+            ctx.ellipse(0, 9, 44, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#dc2626";
+            ctx.beginPath();
+            ctx.roundRect(-42, -42, 84, 42, 5);
+            ctx.fill();
+            ctx.fillStyle = "#fef08a";
+            ctx.fillRect(-38, -36, 76, 12);
+            ctx.fillStyle = "#1e293b";
+            ctx.beginPath();
+            ctx.arc(-24, 3, 9, 0, Math.PI * 2);
+            ctx.arc(24, 3, 9, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+
+          case "puddle":
+            ctx.fillStyle = "rgba(56, 189, 248, 0.55)";
+            ctx.beginPath();
+            ctx.ellipse(0, 2, 26, 9, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#7dd3fc";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            break;
+
+          case "cow":
+            ctx.fillStyle = "#f8fafc";
+            ctx.beginPath();
+            ctx.roundRect(-18, -22, 34, 20, 5);
+            ctx.fill();
+            ctx.fillStyle = "#1e293b";
+            ctx.fillRect(-8, -18, 7, 7);
+            ctx.fillRect(4, -14, 6, 6);
+            // Head & horns
+            ctx.fillStyle = "#f1f5f9";
+            ctx.beginPath();
+            ctx.roundRect(10, -28, 13, 13, 4);
+            ctx.fill();
+            break;
+
+          case "cart":
+            ctx.fillStyle = "#b45309";
+            ctx.fillRect(-20, -22, 40, 16);
+            ctx.fillStyle = "#f97316";
+            ctx.fillRect(-16, -28, 32, 6);
+            ctx.fillStyle = "#1e293b";
+            ctx.beginPath();
+            ctx.arc(-11, 2, 7, 0, Math.PI * 2);
+            ctx.arc(11, 2, 7, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+
+          case "pothole":
+            ctx.fillStyle = "#090d16";
+            ctx.beginPath();
+            ctx.ellipse(0, 2, 22, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#475569";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            break;
+
+          case "banner":
+            // Overhead festive banner requiring ducking
+            ctx.fillStyle = "#92400e";
+            ctx.fillRect(-28, -74, 4, 74);
+            ctx.fillRect(24, -74, 4, 74);
+            ctx.fillStyle = "#f97316";
+            ctx.fillRect(-34, -64, 68, 22);
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "800 9px Inter, sans-serif";
+            ctx.fillText("DUCK ↓", -18, -50);
+            break;
+
+          case "ganpati_crowd":
+            // Festive procession group
+            const crowdColors = ["#fb923c", "#facc15", "#f43f5e", "#38bdf8"];
+            for (let g = -1; g <= 1; g++) {
+              ctx.fillStyle = crowdColors[g + 1];
+              ctx.fillRect(g * 13 - 5, -18, 10, 16);
+              ctx.fillStyle = "#d99b66";
+              ctx.beginPath();
+              ctx.arc(g * 13, -23, 5, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            break;
+        }
+
+        ctx.restore();
+      }
+
+      function renderScene() {
+        ctx.save();
+        ctx.scale(dpr, dpr);
+
+        const currentLandmark = LANDMARKS[Math.floor(distanceTraveled / 2400) % LANDMARKS.length];
+
+        drawSkyAndLandmarks(currentLandmark);
+        drawRoadAndLanes();
+
+        // Depth-sorted (Y-sorted) rendering of player and road entities
+        const drawables = [
+          ...entities.map((e) => ({ sortY: e.y, draw: () => drawEntity(e) })),
+          { sortY: player.y, draw: () => drawDabbawalaPlayer() }
+        ];
+        drawables.sort((a, b) => a.sortY - b.sortY);
+        for (const item of drawables) {
+          item.draw();
+        }
+
+        // Particles (rain, splashes, confetti, sparks)
+        for (const p of particles) {
+          const alpha = Math.max(0, Math.min(1, p.life / p.maxLife));
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          if (p.kind === "rain") {
+            ctx.strokeStyle = "rgba(186, 230, 253, 0.65)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x + p.vx * 0.03, p.y + p.length);
+            ctx.stroke();
+          } else if (p.kind === "confetti") {
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size * 0.6, -p.size * 0.35, p.size * 1.2, p.size * 0.7);
+          } else {
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        // Floating score & delivery callouts
+        for (const pop of floatingPopups) {
+          const alpha = Math.max(0, Math.min(1, pop.life / pop.maxLife));
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.font = "800 14px Inter, sans-serif";
+          ctx.fillStyle = "#090d16";
+          ctx.fillText(pop.text, pop.x - 24, pop.y + 1);
+          ctx.fillStyle = pop.color;
+          ctx.fillText(pop.text, pop.x - 25, pop.y);
+          ctx.restore();
+        }
+
+        // Subtle monsoon lightning flash
+        if (lightningAlpha > 0) {
+          ctx.fillStyle = `rgba(224, 242, 254, ${lightningAlpha})`;
+          ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        }
+
+        // Bottom-left landmark & weather pill inside canvas
+        ctx.fillStyle = "rgba(15, 23, 42, 0.72)";
+        ctx.beginPath();
+        ctx.roundRect(16, VIRTUAL_HEIGHT - 44, 275, 28, 14);
+        ctx.fill();
+
+        ctx.fillStyle = currentLandmark.accent;
+        ctx.font = "700 12px Inter, sans-serif";
+        const weatherTag = isRaining ? " • 🌧️ Monsoon" : isNight ? " • 🌙 Night" : " • ☀️ Day";
+        ctx.fillText(`📍 ${currentLandmark.name}${weatherTag}`, 28, VIRTUAL_HEIGHT - 26);
+
+        ctx.restore();
+      }
+
+      // =========================================================================
+      // 9. MAIN REQUESTANIMATIONFRAME LOOP
+      // =========================================================================
+      let lastTimestamp = performance.now();
+
+      function mainLoop(now) {
+        const rawDt = (now - lastTimestamp) / 1000;
+        lastTimestamp = now;
+        const dt = Math.min(0.05, Math.max(0.001, rawDt));
+
+        try {
+          updateSimulation(dt);
+          renderScene();
+        } catch (err) {
+          console.error("Game loop error:", err);
+        }
+
+        requestAnimationFrame(mainLoop);
+      }
+
+      initTriviaScreens();
+      updateHudDom();
+      requestAnimationFrame(mainLoop);
+    })();
+  </script>
+</body>
+</html>
